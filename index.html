@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aditya Generative AI Demo</title>
+    <style>
+        #video {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        #canvas {
+            display: none;
+        }
+        button {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #output {
+            margin: 20px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Aditya Generative AI Demo</h1>
+    <label for="prompt">Enter your prompt:</label><br>
+    <input type="text" id="prompt" name="prompt"><br>
+    <button onclick="generateContent()">Generate</button><br>
+    <div id="output"></div>
+
+    <video id="video" autoplay></video>
+    <button id="snap">Take Photo</button>
+    <canvas id="canvas" width="600" height="400"></canvas>
+    <div id="imageDetails"></div>
+    <button id="openMaps" style="display: none;">Open Location on Maps</button>
+
+    <script src="script.js"></script>
+    <script>
+        async function generateContent() {
+            const prompt = document.getElementById("prompt").value;
+            try {
+                const response = await fetch("/generate", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ prompt })
+                });
+                const result = await response.json();
+                document.getElementById("output").innerText = result.text;
+            } catch (error) {
+                console.error("Error generating content:", error);
+                document.getElementById("output").innerText = "An error occurred.";
+            }
+        }
+
+        // Initialize video stream
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(function(stream) {
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                video.play();
+            })
+            .catch(function(err) {
+                console.error("An error occurred: " + err);
+            });
+
+        // Take photo and handle image
+        document.getElementById('snap').addEventListener('click', function() {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const context = canvas.getContext('2d');
+            
+            // Draw the current frame of the video onto the canvas
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Convert the canvas content to a data URL representing the image
+            const dataURL = canvas.toDataURL('image/png');
+            
+            // Display the image on the page
+            const img = new Image();
+            img.src = dataURL;
+            document.body.appendChild(img);
+
+            // Display image details
+            const imageDetails = document.getElementById('imageDetails');
+            const currentDate = new Date();
+            const currentTime = currentDate.toLocaleString();
+            imageDetails.innerHTML = `<strong>Image Details:</strong><br>Time: ${currentTime}<br>`;
+
+            // Get current geolocation
+            navigator.geolocation.getCurrentPosition(function(position) {
+                const latitude = position.coords.latitude;
+                const longitude = position.coords.longitude;
+                imageDetails.innerHTML += `Latitude: ${latitude}<br>Longitude: ${longitude}`;
+
+                // Fetch location name using OpenCage Geocoding API
+                const apiKey = '2ea0d279b13a4596a366bc7207ba8b96';
+                fetch(`https://api.opencagedata.com/geocode/v1/json?q=${latitude}+${longitude}&key=${apiKey}&language=en&pretty=1`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const locationName = data.results[0].formatted;
+                        imageDetails.innerHTML += `<br>Location: ${locationName}`;
+
+                        // Show button to open in Google Maps
+                        const openMapsButton = document.getElementById('openMaps');
+                        openMapsButton.style.display = 'block';
+                        openMapsButton.onclick = function() {
+                            const googleMapsLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
+                            window.open(googleMapsLink, '_blank');
+                        };
+
+                        // Set the detected time and location values to the prompt input field
+                        const promptInput = document.getElementById('prompt');
+                        promptInput.value = `My name is Aditya. My address is 208, Ganeshpeth, Maharashtra, Nagpur, Chtnis Nagar, Pincode 440013. I have a problem with trash. I have clicked a photo: ${imageDetails.innerHTML}, Location: ${locationName}. Write a letter to NMC to fix the problem. Today's date is ${new Date().toISOString().split('T')[0]}`;
+                    })
+                    .catch(error => {
+                        console.error("Error fetching location data:", error);
+                    });
+            }, function(error) {
+                console.error("Error getting geolocation: " + error.message);
+            });
+        });
+    </script>
+</body>
+</html>
